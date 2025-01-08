@@ -1,49 +1,41 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import pickle
+import joblib
 
-# Load the trained model
+# Load the trained model and feature names
 with open('car_price_model.pkl', 'rb') as file:
-    model = pickle.load(file)
+    model, feature_names = joblib.load(file)
 
-# Streamlit app
+# Streamlit app title
 st.title("Used Car Price Prediction")
 
-# Input fields for user
-brand_model = st.text_input("Brand & Model")
-varient = st.text_input("Variant")
-fuel_type = st.selectbox("Fuel Type", ["PETROL", "DIESEL"])
-driven_kilometers = st.number_input("Driven Kilometers", min_value=0.0, step=100.0)
+# Create input fields for user input
+fuel_type = st.selectbox("Fuel Type", ["DIESEL", "PETROL", "CNG", "ELECTRIC"])
+driven_km = st.text_input("Driven Kilometers (e.g., 50000)")
 transmission = st.selectbox("Transmission", ["MANUAL", "AUTOMATIC"])
-owner = st.selectbox("Owner Type", ["1st Owner", "2nd Owner", "3rd Owner"])
-location = st.text_input("Location")
+owner = st.selectbox("Owner Type", ["1st Owner", "2nd Owner", "3rd Owner", "4th Owner or more"])
 
 # Predict button
 if st.button("Predict Price"):
-    # Create a DataFrame for the input
-    input_data = {
-        'Brand & Model': [brand_model],
-        'Varient': [varient],
-        'Fuel Type': [fuel_type],
-        'Driven Kilometers': [driven_kilometers],
-        'Transmission': [transmission],
-        'Owner': [owner],
-        'Location': [location]
-    }
-    input_df = pd.DataFrame(input_data)
-    
-    # Preprocess input like the training data
-    # (Ensure the same preprocessing steps are applied)
-    input_df['Driven Kilometers'] = input_df['Driven Kilometers'].astype(float)
-    input_df = pd.get_dummies(input_df, columns=['Brand & Model', 'Varient', 'Fuel Type', 'Transmission', 'Owner', 'Location'], drop_first=True)
-    
-    # Align input_df with training data columns
-    for col in model.feature_names_in_:
-        if col not in input_df.columns:
-            input_df[col] = 0
-    input_df = input_df[model.feature_names_in_]
-    
-    # Predict
-    predicted_price = model.predict(input_df)
-    st.success(f"The predicted price of the car is ₹{predicted_price[0]:,.2f}")
+    try:
+        # Preprocess user inputs
+        data = pd.DataFrame({
+            'Driven Kilometers': [float(driven_km)],
+            'Fuel Type_DIESEL': [1 if fuel_type == "DIESEL" else 0],
+            'Fuel Type_PETROL': [1 if fuel_type == "PETROL" else 0],
+            'Fuel Type_CNG': [1 if fuel_type == "CNG" else 0],
+            'Fuel Type_ELECTRIC': [1 if fuel_type == "ELECTRIC" else 0],
+            'Transmission_AUTOMATIC': [1 if transmission == "AUTOMATIC" else 0],
+            'Owner_2nd Owner': [1 if owner == "2nd Owner" else 0],
+            'Owner_3rd Owner': [1 if owner == "3rd Owner" else 0],
+            'Owner_4th Owner or more': [1 if owner == "4th Owner or more" else 0]
+        })
+
+        # Align input data with the feature names
+        data = data.reindex(columns=feature_names, fill_value=0)
+
+        # Predict the price
+        predicted_price = model.predict(data)[0]
+        st.success(f"The estimated price of the car is ₹{round(predicted_price, 2)}")
+    except Exception as e:
+        st.error(f"Error: {e}. Please check your inputs.")
